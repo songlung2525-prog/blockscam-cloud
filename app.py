@@ -49,6 +49,35 @@ vectorizer, ai_model = load_ai_model()
 
 # --- 3. ส่วนหน้าจอ (Frontend) ---
 st.set_page_config(page_title="BlockScam Cloud", page_icon="☁️")
+# --- NEW: ปรับแต่ง CSS ให้เหมือนแอปมือถือ ---
+st.markdown("""
+<style>
+    /* ซ่อนเมนูขวาบนและ Footer ที่รกๆ */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    
+    /* ปรับขอบจอให้ชิดขึ้น (จะได้ไม่เปลืองที่) */
+    .block-container {
+        padding-top: 1rem;
+        padding-bottom: 2rem;
+    }
+    
+    /* เปลี่ยนปุ่มกดให้เต็มจอ (กดง่ายในมือถือ) */
+    .stButton>button {
+        width: 100%;
+        border-radius: 20px; /* ทำขอบมนๆ */
+        height: 3em;         /* เพิ่มความสูงปุ่ม */
+        font-weight: bold;   /* ตัวหนา */
+        box-shadow: 0px 2px 5px rgba(0,0,0,0.2); /* ใส่เงาให้ดูมีมิติ */
+    }
+    
+    /* ปรับช่องกรอกข้อความให้ใหญ่ขึ้น */
+    .stTextInput>div>div>input {
+        font-size: 16px; 
+    }
+</style>
+""", unsafe_allow_html=True)
 st.title("☁️ BlockScam AI (Online Ver.)")
 st.caption("ระบบตรวจสอบมิจฉาชีพ ที่ใครๆ ก็เข้าถึงได้")
 
