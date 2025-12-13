@@ -55,7 +55,7 @@ st.markdown("""
     /* ซ่อนเมนูขวาบนและ Footer ที่รกๆ */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
-    header {visibility: hidden;}
+    
     
     /* ปรับขอบจอให้ชิดขึ้น (จะได้ไม่เปลืองที่) */
     .block-container {
