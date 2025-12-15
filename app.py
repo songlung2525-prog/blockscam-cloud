@@ -41,9 +41,13 @@ def save_to_sheet(phone, risk, note):
 
         # เชื่อมต่อ Client
         client = gspread.authorize(creds)
+
+        # แก้เป็นบรรทัดนี้ครับ (ใช้ open_by_key แทน)
+        sheet_id =    "1H3IC-sDGa4f2TebGTxOsc3WI_p0RNJPgEwckxgBniD4"
+        sheet = client.open_by_key(sheet_id).worksheet("Logs")
         
-        # เปิดไฟล์ Sheet (ต้องตรงกับชื่อไฟล์จริง)
-        sheet = client.open("BlockScam_Data").worksheet("Logs")
+    
+        1H3IC-sDGa4f2TebGTxOsc3WI_p0RNJPgEwckxgBniD4
         
         # บันทึกข้อมูล
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -116,6 +120,7 @@ elif menu == "💬 สแกนแชต (AI)":
     
 
         
+
 
 
 
