@@ -1,4 +1,2 @@
 streamlit
-sqlalchemy
-scikit-learn
-pandas
+google-generativeai
