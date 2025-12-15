@@ -47,7 +47,7 @@ def save_to_sheet(phone, risk, note):
         sheet = client.open_by_key(sheet_id).worksheet("Logs")
         
     
-        1H3IC-sDGa4f2TebGTxOsc3WI_p0RNJPgEwckxgBniD4
+
         
         # บันทึกข้อมูล
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -120,6 +120,7 @@ elif menu == "💬 สแกนแชต (AI)":
     
 
         
+
 
 
 
