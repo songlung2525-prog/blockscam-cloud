@@ -94,13 +94,46 @@ elif menu == "💬 สแกนแชต (AI)":
                     response = model.generate_content(prompt)
                     st.markdown("### 🛡️ ผลการวิเคราะห์:")
                     st.write(response.text)
+
+                    # === ส่วนเชื่อมต่อ Google Sheet (ฉบับแก้ Permission) ===
+def save_to_sheet(phone, risk, note):
+    try:
+        # 1. กำหนดสิทธิ์: บังคับว่าต้องขออนุญาต "แก้ไข Google Sheet" และ "เข้า Google Drive"
+        scopes = [
+            "https://www.googleapis.com/auth/spreadsheets",
+            "https://www.googleapis.com/auth/drive"
+        ]
+        
+        # 2. ดึงกุญแจจาก Secrets (แบบ gcp_service_account)
+        if "gcp_service_account" in st.secrets:
+            # แปลงข้อมูลเป็น Dictionary เพื่อความชัวร์
+            secret_dict = dict(st.secrets["gcp_service_account"])
+            
+            # สร้าง Credentials พร้อมแนบ Scopes (สำคัญมาก! บรรทัดนี้คือตัวแก้ Error 403)
+            creds = Credentials.from_service_account_info(secret_dict, scopes=scopes)
+            
+            # เชื่อมต่อ
+            client = gspread.authorize(creds)
+            
+            # เปิดไฟล์ Sheet (ชื่อต้องตรงเป๊ะ)
+            sheet = client.open("BlockScam_Data").worksheet("Logs")
+            
+            # บันทึกข้อมูล
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            sheet.append_row([timestamp, phone, risk, note])
+            return True
+        else:
+            st.error("ไม่พบกุญแจ gcp_service_account ใน Secrets")
+            return False
+
+    except Exception as e:
+        st.error(f"บันทึกข้อมูลไม่สำเร็จ: {e}")
+        return False
                     
-                    # บันทึกลง Sheet
-                    save_to_sheet("Chat Scan", "AI Analyzed", chat_text[:50]+"...")
-                    st.toast("✅ บันทึกประวัติแล้ว", icon="💾")
-                    
-                except Exception as e:
-                    st.error(f"เกิดข้อผิดพลาด: {e}")
+    
+
+        
+
 
 
 
