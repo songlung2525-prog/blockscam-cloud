@@ -6,36 +6,15 @@ import json
 from datetime import datetime
 
 # === 1. ตั้งค่าหน้าเว็บ ===
-st.set_page_config(page_title="BlockScam V4.4 Debug", page_icon="🔧")
-st.title("🔧 BlockScam V4.4 (โหมดแก้ปัญหา)")
-st.write("เวอร์ชันนี้จะโชว์ชื่อโมเดลและ Error ทั้งหมดเพื่อหาสาเหตุ")
+st.set_page_config(page_title="BlockScam V5.0", page_icon="🛡️")
+st.image("https://cdn-icons-png.flaticon.com/512/9529/9529452.png", width=80)
+st.title("🛡️ BlockScam V5.0 (Final Stable)")
+st.write("เวอร์ชันเสถียร: บังคับใช้ Gemini 1.5 Flash")
 
-# === 2. ฟังก์ชันเลือกโมเดล (พร้อมตัวแปรบอกชื่อ) ===
+# === 2. ฟังก์ชัน AI (แบบเจาะจง ไม่ค้นหาแล้ว) ===
 def get_ai_model():
-    # รายชื่อโมเดลที่อยากได้
-    target_models = [
-        "gemini-1.5-flash",       # ตัวหลัก
-        "gemini-1.5-flash-001",
-        "gemini-pro"              # ตัวกันตาย
-    ]
-    
-    try:
-        available_models = [m.name.replace("models/", "") for m in genai.list_models()]
-        
-        # วนหาทีละตัว
-        for target in target_models:
-            if target in available_models:
-                return genai.GenerativeModel(target), target # ส่งคืนทั้งโมเดลและชื่อ
-        
-        # ถ้าไม่เจอเลย เอาตัวแรกที่มีคำว่า flash
-        for m in available_models:
-            if "flash" in m:
-                return genai.GenerativeModel(m), m
-                
-        return genai.GenerativeModel('gemini-pro'), "gemini-pro (Fallback)"
-
-    except Exception as e:
-        return None, f"Error finding model: {e}"
+    # บังคับใช้ตัวนี้เท่านั้น (เสถียร + โควตาเยอะ)
+    return genai.GenerativeModel('gemini-1.5-flash')
 
 # === 3. ฟังก์ชันเชื่อมต่อ Google Sheet ===
 def get_sheet_connection():
@@ -55,6 +34,7 @@ def get_sheet_connection():
         try:
             return client.open("BlockScam_Data").worksheet("Logs")
         except:
+            # ใส่ ID สำรองของคุณ (เผื่อหาชื่อไม่เจอ)
             return client.open_by_key("1H3IC-sDGa4f2TebGTxOsc3WI_p0RNJPgEwckxgBniD4").worksheet("Logs")
     except:
         return None
@@ -64,8 +44,9 @@ def save_to_sheet(col1, col2, col3):
         sheet = get_sheet_connection()
         if sheet:
             sheet.append_row([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), col1, col2, col3])
+            return True
     except:
-        pass
+        return False # เงียบไว้ถ้าพัง
 
 def check_blacklist(phone):
     try:
@@ -80,30 +61,67 @@ if "GEMINI_API_KEY" in st.secrets:
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
 
 # === เมนูหลัก ===
-menu = st.sidebar.radio("เมนู:", ["🔍 เช็กเบอร์โทร", "💬 สแกนแชต", "🔗 สแกนลิงก์", "📢 รายงาน"])
+menu = st.sidebar.radio("เมนู:", ["🔍 เช็กเบอร์โทร", "💬 สแกนแชต", "🔗 สแกนลิงก์", "📢 รายงานเบอร์โจร"])
 
-# ฟีเจอร์: สแกนลิงก์ (โหมด Debug)
-if menu == "🔗 สแกนลิงก์":
-    st.header("🔗 สแกนลิงก์ (Debug)")
+# ฟีเจอร์ 1: เช็กเบอร์
+if menu == "🔍 เช็กเบอร์โทร":
+    st.header("🔍 ตรวจสอบเบอร์โทรศัพท์")
+    phone = st.text_input("เบอร์โทร:", placeholder="081xxxxxxx")
+    if st.button("ตรวจสอบ"):
+        if phone:
+            with st.spinner("กำลังค้นหา..."):
+                if check_blacklist(phone):
+                    st.error(f"🚨 อันตราย! เบอร์ {phone} มีในบัญชีดำ")
+                    save_to_sheet(phone, "อันตราย (Blacklist)", "User Checked")
+                else:
+                    risk = "เบอร์แปลก" if (phone.startswith("06") or len(phone) > 10) else "ปลอดภัย"
+                    if risk == "เบอร์แปลก": st.warning("⚠️ เบอร์แปลก/ไม่คุ้นเคย")
+                    else: st.success("✅ ไม่พบประวัติ")
+                    save_to_sheet(phone, risk, "User Checked")
+
+# ฟีเจอร์ 2: สแกนแชต
+elif menu == "💬 สแกนแชต":
+    st.header("💬 วิเคราะห์แชต")
+    chat = st.text_area("ข้อความแชต:")
+    if st.button("วิเคราะห์"):
+        if chat:
+            with st.spinner("🤖 AI กำลังอ่าน..."):
+                try:
+                    model = get_ai_model()
+                    res = model.generate_content(f"วิเคราะห์ข้อความนี้ว่าเป็นมิจฉาชีพไหม: '{chat}' ตอบสั้นๆ")
+                    st.info(res.text)
+                    save_to_sheet("Chat", "AI Scan", chat[:30])
+                except Exception as e:
+                    if "429" in str(e): st.warning("🚦 คนใช้งานเยอะ กรุณารอสักครู่")
+                    else: st.error(f"Error: {e}")
+
+# ฟีเจอร์ 3: สแกนลิงก์ (ตัวปราบเซียน)
+elif menu == "🔗 สแกนลิงก์":
+    st.header("🔗 สแกนลิงก์อันตราย")
     url = st.text_input("URL:")
     if st.button("สแกน"):
         if url:
-            with st.spinner("🔍 กำลังทำงาน..."):
+            with st.spinner("🔍 กำลังส่องกล้อง..."):
                 try:
-                    # 1. โชว์ชื่อโมเดลก่อนเลย
-                    model, model_name = get_ai_model()
-                    st.info(f"ℹ️ ระบบกำลังใช้โมเดลชื่อ: **{model_name}**")
+                    model = get_ai_model()
+                    # ปลดล็อก Safety เพื่อให้ตรวจสอบเว็บพนัน/โกงได้
+                    safety = [{"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"}]
+                    res = model.generate_content(f"วิเคราะห์ URL นี้ว่าอันตรายไหม: '{url}' ตอบสั้นๆ", safety_settings=safety)
                     
-                    if "Error" in model_name:
-                        st.error(model_name)
-                    else:
-                        # 2. ลองยิงคำถาม (ไม่ดักจับ Error แล้ว ปล่อยให้มันฟ้องมาเลย)
-                        safety = [{"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"}]
-                        res = model.generate_content(f"วิเคราะห์ URL นี้ว่าอันตรายไหม: '{url}' ตอบสั้นๆ", safety_settings=safety)
-                        st.success(res.text)
-                        save_to_sheet(url, "Link Scan", res.text[:30])
-                        
+                    st.success("✅ เรียบร้อย!")
+                    st.write(res.text)
+                    save_to_sheet(url, "Link Scan", res.text[:30])
                 except Exception as e:
-                    # 3. โชว์ Error ตัวเต็ม
-                    st.error("🚨 เกิดข้อผิดพลาดจาก Google:")
-                    st.code(e) # แสดง Code Error แบบดิบๆ
+                    if "429" in str(e): st.warning("🚦 คนใช้งานเยอะ กรุณารอสักครู่")
+                    else: st.error(f"Error: {e}")
+
+# ฟีเจอร์ 4: รายงาน
+elif menu == "📢 รายงานเบอร์โจร":
+    st.header("📢 แจ้งเบาะแส")
+    p = st.text_input("เบอร์โจร:")
+    d = st.text_area("รายละเอียด:")
+    if st.button("ส่งข้อมูล"):
+        if p and d:
+            save_to_sheet(p, "User Report", d)
+            st.balloons()
+            st.success("✅ บันทึกแล้ว ขอบคุณครับ!")
