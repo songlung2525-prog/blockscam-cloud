@@ -6,32 +6,30 @@ import json
 from datetime import datetime
 
 # === 1. ตั้งค่าหน้าเว็บ ===
-st.set_page_config(page_title="BlockScam V5.2", page_icon="🛡️")
+st.set_page_config(page_title="BlockScam V5.3", page_icon="🛡️")
 st.image("https://cdn-icons-png.flaticon.com/512/9529/9529452.png", width=80)
-st.title("🛡️ BlockScam V5.2 (Anti-Limit)")
-st.write("เวอร์ชันแก้ไข: บล็อกโมเดลทดสอบ (2.5) เพื่อเลี่ยงโควตาเต็ม")
+st.title("🛡️ BlockScam V5.3 (Old Reliable)")
+st.write("เวอร์ชัน: เน้นใช้ Gemini Pro (รุ่นเสถียร) + โชว์ชื่อโมเดล")
 
-# === 2. ฟังก์ชันค้นหาโมเดล (เพิ่มตัวกรอง Ban 2.5) ===
+# === 2. ฟังก์ชันค้นหาโมเดล (เน้นหาตัว Pro ก่อน Flash) ===
 def get_ai_model():
     try:
-        # 1. พยายามหา Gemini 1.5 Flash (ตัวที่ดีที่สุดและเสถียร)
-        for m in genai.list_models():
-            name = m.name.lower()
-            if '2.5' in name: continue # ❌ ข้ามตัว 2.5 ไปเลย (ตัวปัญหา)
-            
-            if 'flash' in name and '1.5' in name:
-                return genai.GenerativeModel(m.name)
+        model_list = genai.list_models()
         
-        # 2. ถ้าไม่เจอ 1.5 ให้หาตัว Pro (ตัวสำรอง กันตาย)
-        for m in genai.list_models():
-            name = m.name.lower()
-            if 'pro' in name and 'vision' not in name: # เลี่ยงตัว vision ที่อาจยุ่งยาก
-                return genai.GenerativeModel(m.name)
-
-        # 3. ถ้าไม่เจออะไรเลยจริงๆ ให้ใช้ค่าพื้นฐาน
-        return genai.GenerativeModel('gemini-pro')
-    except:
-        return None
+        # 1. ลองหา 'gemini-pro' (ตัวรุ่นพี่ เสถียรสุด)
+        for m in model_list:
+            if 'gemini-pro' in m.name and 'vision' not in m.name:
+                return genai.GenerativeModel(m.name), m.name # คืนค่าโมเดล + ชื่อ
+        
+        # 2. ถ้าไม่มีจริงๆ ค่อยหา Flash (แต่เลี่ยงตัว 2.5)
+        for m in model_list:
+            if 'flash' in m.name and '2.5' not in m.name:
+                return genai.GenerativeModel(m.name), m.name
+                
+        # 3. กันตาย
+        return genai.GenerativeModel('gemini-pro'), "gemini-pro (Fallback)"
+    except Exception as e:
+        return None, str(e)
 
 # === 3. ฟังก์ชันเชื่อมต่อ Google Sheet ===
 def get_sheet_connection():
@@ -103,13 +101,15 @@ elif menu == "💬 สแกนแชต":
         if chat:
             with st.spinner("🤖 AI กำลังอ่าน..."):
                 try:
-                    model = get_ai_model()
+                    model, model_name = get_ai_model() # รับชื่อโมเดลมาด้วย
+                    st.caption(f"⚙️ กำลังใช้สมองรุ่น: {model_name}") # โชว์ชื่อรุ่นให้เห็นกันจะๆ
+                    
                     if model:
                         res = model.generate_content(f"วิเคราะห์ข้อความนี้ว่าเป็นมิจฉาชีพไหม: '{chat}' ตอบสั้นๆ")
                         st.info(res.text)
                         save_to_sheet("Chat", "AI Scan", chat[:30])
                     else:
-                        st.error("ไม่พบโมเดล AI")
+                        st.error(f"ไม่พบโมเดล AI: {model_name}")
                 except Exception as e:
                     if "429" in str(e): st.warning("🚦 คนใช้งานเยอะ กรุณารอสักครู่ (Rate Limit)")
                     else: st.error(f"Error: {e}")
@@ -122,7 +122,9 @@ elif menu == "🔗 สแกนลิงก์":
         if url:
             with st.spinner("🔍 กำลังส่องกล้อง..."):
                 try:
-                    model = get_ai_model()
+                    model, model_name = get_ai_model() # รับชื่อโมเดลมาด้วย
+                    st.caption(f"⚙️ กำลังใช้สมองรุ่น: {model_name}") # โชว์ชื่อรุ่นให้เห็นกันจะๆ
+
                     if model:
                         safety = [{"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"}]
                         res = model.generate_content(f"วิเคราะห์ URL นี้ว่าอันตรายไหม: '{url}' ตอบสั้นๆ", safety_settings=safety)
@@ -130,7 +132,7 @@ elif menu == "🔗 สแกนลิงก์":
                         st.write(res.text)
                         save_to_sheet(url, "Link Scan", res.text[:30])
                     else:
-                        st.error("ไม่พบโมเดล AI")
+                        st.error(f"ไม่พบโมเดล AI: {model_name}")
                 except Exception as e:
                     if "429" in str(e): st.warning("🚦 คนใช้งานเยอะ กรุณารอสักครู่ (Rate Limit)")
                     else: st.error(f"Error: {e}")
