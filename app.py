@@ -6,15 +6,24 @@ import json
 from datetime import datetime
 
 # === 1. ตั้งค่าหน้าเว็บ ===
-st.set_page_config(page_title="BlockScam V4.1", page_icon="🛡️")
+st.set_page_config(page_title="BlockScam V4.2", page_icon="🛡️")
 st.image("https://cdn-icons-png.flaticon.com/512/9529/9529452.png", width=80)
-st.title("🛡️ BlockScam V4.1 (Stable)")
-st.write("ระบบตรวจสอบภัยไซเบอร์ (Force Flash Model)")
+st.title("🛡️ BlockScam V4.2 (Final Fix)")
+st.write("ระบบตรวจสอบภัยไซเบอร์ (Auto-Model + Database)")
 
-# === 2. ฟังก์ชัน AI (บังคับใช้ Flash เพื่อความชัวร์) ===
+# === 2. ฟังก์ชันค้นหาโมเดล AI อัตโนมัติ (เอาอันที่เคย Work กลับมา!) ===
 def get_ai_model():
-    # ไม่ต้องค้นหาแล้ว ใช้ตัวนี้เลย เร็วและชัวร์สุด
-    return genai.GenerativeModel('gemini-1.5-flash')
+    try:
+        # วนหาโมเดลที่มีอยู่จริงในเครื่อง
+        for m in genai.list_models():
+            if 'generateContent' in m.supported_generation_methods:
+                # ถ้าเจอชื่อที่มีคำว่า flash หรือ pro ให้เอาตัวนั้นเลย
+                if 'flash' in m.name or 'pro' in m.name:
+                    return genai.GenerativeModel(m.name)
+        # ถ้าหาไม่เจอจริงๆ ให้ลองเสี่ยงดวงกับ gemini-pro
+        return genai.GenerativeModel('gemini-pro')
+    except:
+        return None
 
 # === 3. ฟังก์ชันเชื่อมต่อ Google Sheet ===
 def get_sheet_connection():
@@ -39,7 +48,6 @@ def get_sheet_connection():
         try:
             return client.open("BlockScam_Data").worksheet("Logs")
         except:
-            # รหัส Sheet สำรอง (ของคุณ)
             sheet_id = "1H3IC-sDGa4f2TebGTxOsc3WI_p0RNJPgEwckxgBniD4" 
             return client.open_by_key(sheet_id).worksheet("Logs")
     except Exception as e:
@@ -88,18 +96,18 @@ if menu == "🔍 เช็กเบอร์โทร":
                 
                 risk = ""
                 if is_blacklisted:
-                    st.error(f"🚨 อันตราย! เบอร์ {phone} มีประวัติในระบบ (เคยมีคนรายงานแล้ว)")
+                    st.error(f"🚨 อันตราย! เบอร์ {phone} มีประวัติในระบบ")
                     risk = "อันตราย (พบในฐานข้อมูล)"
                 else:
                     if phone.startswith("06") or len(phone) > 10:
-                        st.warning(f"⚠️ มีความเสี่ยง (เบอร์แปลก/ไม่คุ้นเคย)")
+                        st.warning(f"⚠️ มีความเสี่ยง (เบอร์แปลก)")
                         risk = "เบอร์แปลก"
                     else:
-                        st.success(f"✅ ปลอดภัย (ไม่พบข้อมูลในระบบ)")
+                        st.success(f"✅ ปลอดภัย")
                         risk = "ไม่พบประวัติ"
                 save_to_sheet(phone, risk, "User Checked")
 
-# ฟีเจอร์ 2: สแกนแชต (AI) - ใช้ model Flash โดยตรง
+# ฟีเจอร์ 2: สแกนแชต (AI)
 elif menu == "💬 สแกนแชต (AI)":
     st.header("💬 วิเคราะห์แชต")
     chat = st.text_area("วางแชตที่นี่:")
@@ -108,13 +116,19 @@ elif menu == "💬 สแกนแชต (AI)":
         if chat:
             with st.spinner("🤖 AI กำลังคิด..."):
                 try:
-                    # เรียกใช้ฟังก์ชันที่บังคับเป็น Flash แล้ว
+                    # ใช้ฟังก์ชัน get_ai_model() ตัวเดิมที่เคย Work!
                     model = get_ai_model()
-                    res = model.generate_content(f"วิเคราะห์ข้อความนี้ว่าเป็นมิจฉาชีพไหม: '{chat}' ตอบสั้นๆ")
-                    st.write(res.text)
-                    save_to_sheet("Chat", "AI Scan", chat[:30])
+                    if model:
+                        res = model.generate_content(f"วิเคราะห์ข้อความนี้ว่าเป็นมิจฉาชีพไหม: '{chat}' ตอบสั้นๆ")
+                        st.write(res.text)
+                        save_to_sheet("Chat", "AI Scan", chat[:30])
+                    else:
+                        st.error("ไม่พบโมเดล AI")
                 except Exception as e:
-                    st.error(f"ระบบขัดข้อง: {e}")
+                    if "429" in str(e) or "ResourceExhausted" in str(e):
+                        st.warning("🚦 AI ทำงานหนักเกินไป กรุณารอสักครู่")
+                    else:
+                        st.error(f"ระบบขัดข้อง: {e}")
 
 # ฟีเจอร์ 3: สแกนลิงก์ (AI)
 elif menu == "🔗 สแกนลิงก์ (AI)":
@@ -125,10 +139,11 @@ elif menu == "🔗 สแกนลิงก์ (AI)":
             with st.spinner("🔍 กำลังส่อง..."):
                 try:
                     model = get_ai_model()
-                    safety = [{"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"}]
-                    res = model.generate_content(f"วิเคราะห์ URL นี้ว่าอันตรายไหม: '{url}' ตอบสั้นๆ", safety_settings=safety)
-                    st.write(res.text)
-                    save_to_sheet(url, "Link Scan", res.text[:30])
+                    if model:
+                        safety = [{"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"}]
+                        res = model.generate_content(f"วิเคราะห์ URL นี้ว่าอันตรายไหม: '{url}' ตอบสั้นๆ", safety_settings=safety)
+                        st.write(res.text)
+                        save_to_sheet(url, "Link Scan", res.text[:30])
                 except Exception as e:
                     st.error(f"Error: {e}")
 
