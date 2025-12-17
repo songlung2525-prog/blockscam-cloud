@@ -6,15 +6,25 @@ import json
 from datetime import datetime
 
 # === 1. ตั้งค่าหน้าเว็บ ===
-st.set_page_config(page_title="BlockScam V5.0", page_icon="🛡️")
+st.set_page_config(page_title="BlockScam V5.1", page_icon="🛡️")
 st.image("https://cdn-icons-png.flaticon.com/512/9529/9529452.png", width=80)
-st.title("🛡️ BlockScam V5.0 (Final Stable)")
-st.write("เวอร์ชันเสถียร: บังคับใช้ Gemini 1.5 Flash")
+st.title("🛡️ BlockScam V5.1 (Auto-Fallback)")
+st.write("เวอร์ชันเสถียร: ค้นหาโมเดลอัตโนมัติ + เชื่อมฐานข้อมูล")
 
-# === 2. ฟังก์ชัน AI (แบบเจาะจง ไม่ค้นหาแล้ว) ===
+# === 2. ฟังก์ชันค้นหาโมเดล AI (กลับมาใช้ท่าไม้ตายเดิม!) ===
 def get_ai_model():
-    # บังคับใช้ตัวนี้เท่านั้น (เสถียร + โควตาเยอะ)
-    return genai.GenerativeModel('gemini-1.5-flash')
+    try:
+        # วนลูปดูรายชื่อโมเดลทั้งหมดที่ Server มี
+        for m in genai.list_models():
+            if 'generateContent' in m.supported_generation_methods:
+                # ถ้าเจอตัวที่มีคำว่า flash หรือ pro ให้เอาตัวนั้นเลย
+                if 'flash' in m.name or 'pro' in m.name:
+                    return genai.GenerativeModel(m.name)
+        
+        # ถ้าหาไม่เจอจริงๆ ให้ลองเสี่ยงดวงกับ gemini-pro (ตัวกันตาย)
+        return genai.GenerativeModel('gemini-pro')
+    except:
+        return None
 
 # === 3. ฟังก์ชันเชื่อมต่อ Google Sheet ===
 def get_sheet_connection():
@@ -34,7 +44,7 @@ def get_sheet_connection():
         try:
             return client.open("BlockScam_Data").worksheet("Logs")
         except:
-            # ใส่ ID สำรองของคุณ (เผื่อหาชื่อไม่เจอ)
+            # รหัส Sheet สำรองของคุณ
             return client.open_by_key("1H3IC-sDGa4f2TebGTxOsc3WI_p0RNJPgEwckxgBniD4").worksheet("Logs")
     except:
         return None
@@ -46,7 +56,7 @@ def save_to_sheet(col1, col2, col3):
             sheet.append_row([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), col1, col2, col3])
             return True
     except:
-        return False # เงียบไว้ถ้าพัง
+        return False
 
 def check_blacklist(phone):
     try:
@@ -88,14 +98,17 @@ elif menu == "💬 สแกนแชต":
             with st.spinner("🤖 AI กำลังอ่าน..."):
                 try:
                     model = get_ai_model()
-                    res = model.generate_content(f"วิเคราะห์ข้อความนี้ว่าเป็นมิจฉาชีพไหม: '{chat}' ตอบสั้นๆ")
-                    st.info(res.text)
-                    save_to_sheet("Chat", "AI Scan", chat[:30])
+                    if model:
+                        res = model.generate_content(f"วิเคราะห์ข้อความนี้ว่าเป็นมิจฉาชีพไหม: '{chat}' ตอบสั้นๆ")
+                        st.info(res.text)
+                        save_to_sheet("Chat", "AI Scan", chat[:30])
+                    else:
+                        st.error("ไม่พบโมเดล AI")
                 except Exception as e:
                     if "429" in str(e): st.warning("🚦 คนใช้งานเยอะ กรุณารอสักครู่")
                     else: st.error(f"Error: {e}")
 
-# ฟีเจอร์ 3: สแกนลิงก์ (ตัวปราบเซียน)
+# ฟีเจอร์ 3: สแกนลิงก์
 elif menu == "🔗 สแกนลิงก์":
     st.header("🔗 สแกนลิงก์อันตราย")
     url = st.text_input("URL:")
@@ -104,13 +117,14 @@ elif menu == "🔗 สแกนลิงก์":
             with st.spinner("🔍 กำลังส่องกล้อง..."):
                 try:
                     model = get_ai_model()
-                    # ปลดล็อก Safety เพื่อให้ตรวจสอบเว็บพนัน/โกงได้
-                    safety = [{"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"}]
-                    res = model.generate_content(f"วิเคราะห์ URL นี้ว่าอันตรายไหม: '{url}' ตอบสั้นๆ", safety_settings=safety)
-                    
-                    st.success("✅ เรียบร้อย!")
-                    st.write(res.text)
-                    save_to_sheet(url, "Link Scan", res.text[:30])
+                    if model:
+                        safety = [{"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"}]
+                        res = model.generate_content(f"วิเคราะห์ URL นี้ว่าอันตรายไหม: '{url}' ตอบสั้นๆ", safety_settings=safety)
+                        st.success("✅ เรียบร้อย!")
+                        st.write(res.text)
+                        save_to_sheet(url, "Link Scan", res.text[:30])
+                    else:
+                        st.error("ไม่พบโมเดล AI")
                 except Exception as e:
                     if "429" in str(e): st.warning("🚦 คนใช้งานเยอะ กรุณารอสักครู่")
                     else: st.error(f"Error: {e}")
